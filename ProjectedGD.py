@@ -8,10 +8,15 @@ from scipy.linalg import eigh
 # such that ai.T*X^-1*ai <=1 ,  ai for all i
 
 
-def project_psd(X):
+# Example usage
+n = 4  # Dimension of the matrix
+epsilon = 0.001
+
+def project_pd(X):
+    # X is symmetric, not necessarily PD:
     eigenvalues, eigenvectors = eigh(X)
     eigenvalues[eigenvalues < 0] = 0
-    return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+    return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T + epsilon * np.eye(n)
 
 
 def project_constraints(X, constraints):
@@ -46,20 +51,32 @@ def projected_gradient_descent(X_init, constraints, learning_rate, num_iteration
     X = X_init.copy()
 
     for i in range(num_iterations):
+<<<<<<< HEAD
         grad = gradient(X)
         X -= learning_rate * grad
         X = project_psd(X)
         X = project_constraints(X, constraints)
         # print(X)
+=======
+        grad = gradient(X) # is PD
+        X_new = X - learning_rate * grad # X^(t+1) = X^(t) - eta * grad{X^(t)}
+        # X_new is symmetric (sum of symmetric matrices) but not necessarlity PD:
+        X = project_pd(X_new)
+>>>>>>> 9ddd85417751df943f083cf85c77d602adbe009e
 
     return X
 
 
 def main():
+<<<<<<< HEAD
     # Example usage
     n = 50  # Dimension of the matrix
+=======
+>>>>>>> 9ddd85417751df943f083cf85c77d602adbe009e
     X_init = np.random.rand(n, n)  # Initialize a random matrix
-    X_init = X_init @ X_init.T  # Ensure symmetry
+    X_init = X_init @ X_init.T + epsilon*np.eye(n)  # Ensure symmetry and PD.
+
+
     # todo take into account the constraints "such that ai.T*X^-1*ai <=1 ,  ai for all i"  by lagrange multipliers
 
     learning_rate = 0.01
