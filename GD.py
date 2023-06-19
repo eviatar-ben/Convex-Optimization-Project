@@ -15,13 +15,9 @@ def objective(X):
     # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(X))
 
-<<<<<<< HEAD
-=======
 def objective_var_change(C):
 # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(inv(C)))
-
->>>>>>> e716829d7b267385e3041a0b49f41951bf39c0ab
 
 def is_pd(X):
     return np.all(np.linalg.eigvalsh(X) > 0)
