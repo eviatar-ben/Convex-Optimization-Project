@@ -14,6 +14,21 @@ def project_psd(X):
     return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
 
 
+def project_constraints(X, constraints):
+    # Project X onto the feasible set defined by the constraints
+
+    for ai in constraints:
+        # Check if the constraint ai.T * X^(-1) * ai > 1 is violated
+        X_inv = np.linalg.inv(X)
+        while np.dot(ai.T, X_inv).dot(ai) > 1:
+            # Adjust X to satisfy the constraint
+            scaling_factor = np.sqrt(np.dot(ai.T, np.linalg.inv(X)).dot(ai))
+            X /= scaling_factor
+            X_inv = np.linalg.inv(X)  # Recompute X_inv to ensure positive definiteness
+
+    return X
+
+
 def objective(X):
     return np.log(np.linalg.det(X))
 
@@ -27,28 +42,30 @@ def constraint(X, A):
     return np.all([ai.T @ np.linalg.inv(X) @ ai <= 1 for ai in A])
 
 
-def projected_gradient_descent(X_init, learning_rate, num_iterations):
+def projected_gradient_descent(X_init, constraints, learning_rate, num_iterations):
     X = X_init.copy()
 
     for i in range(num_iterations):
         grad = gradient(X)
         X -= learning_rate * grad
         X = project_psd(X)
+        X = project_constraints(X, constraints)
+        # print(X)
 
     return X
 
 
 def main():
     # Example usage
-    n = 40  # Dimension of the matrix
+    n = 50  # Dimension of the matrix
     X_init = np.random.rand(n, n)  # Initialize a random matrix
     X_init = X_init @ X_init.T  # Ensure symmetry
     # todo take into account the constraints "such that ai.T*X^-1*ai <=1 ,  ai for all i"  by lagrange multipliers
 
     learning_rate = 0.01
     num_iterations = 10000
-
-    optimal_X = projected_gradient_descent(X_init, learning_rate, num_iterations)
+    constraints = [np.random.rand(n) for _ in range(10)]
+    optimal_X = projected_gradient_descent(X_init, constraints, learning_rate, num_iterations)
     print(optimal_X)
     print(np.log(np.linalg.det(optimal_X)))
 
