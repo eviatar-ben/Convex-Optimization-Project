@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import Benchmark
 
 np.random.seed(0)
 M = 30  # Number of vectors a
@@ -22,6 +21,7 @@ def objective(X):
 def objective_with_barrier(X, A, alpha=1.0):
     # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(X)) - np.sum([np.log(1 - a.T @ X @ a) for a in A]) * alpha
+
 
 def objective_var_change(C):
     # Objective function: negative logarithm of the determinant of X
@@ -49,10 +49,6 @@ def projected_grad(X):
 
 def check_constraint(X, A):
     return all([constraint(X, a) <= 1.001 for a in A])
-
-
-def get_xT_C_x(X, A):
-    return [constraint(X, a) for a in A]
 
 
 def generate_random_X():
@@ -88,9 +84,8 @@ def generate_initializer(A):
     a_vectors = [a for a in A]
     i_max_norm = np.argmax([np.linalg.norm(a) for a in A])
     a_max_norm = a_vectors[i_max_norm]
-
-    max_norm2 = np.linalg.norm(a_max_norm, ord=2)**2
-    D = np.diag(max_norm2*np.ones(n)) * 2
+    max_norm2 = np.linalg.norm(a_max_norm, ord=2) ** 2
+    D = np.diag(max_norm2 * np.ones(n)) * 2
     # U = generate_orthogonal_basis(a_max_norm)
 
     X0 = D
@@ -100,7 +95,6 @@ def generate_initializer(A):
 
 def solve_optimization(A):
     # Generate a random positive definite symmetric matrix as the initial guess
-
     X0 = generate_initializer(A)
 
     # Define the optimization parameters
@@ -111,23 +105,28 @@ def solve_optimization(A):
     objective_with_barrier_score = []
     C = inv(X0)
     for i in range(max_iter):
-
         C_inv = inv(C)
         t = i + 1
         alpha = 1 / t
+        # alpha = t
+        if np.max([constraint(C, a) for a in A]) > 0.99:
+            pass
+        if np.max([constraint(C, a) for a in A]) > 0.83:
+            alpha =  t
+        multiplier = [a.T @ C @ a - 1 for a in A]  # todo: maybe C_inv
+
         log_barrier = alpha * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
         grad = -C_inv + log_barrier
         C_next = C - step * grad
         C = projected_grad(C_next)
 
-
-        assert check_constraint(C,A)
+        # assert check_constraint(C,A)
 
         if np.linalg.norm(grad) < epsilon:
             break
-        objective_score.append(objective_var_change(C))
-        objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
         if i % 50 == 0:
+            objective_score.append(objective_var_change(C))
+            objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
             print(f"Iteration {i}, objective:{objective_var_change(C)},"
                   f" objective with barrier: {objective_with_barrier(C, A, alpha=alpha)},"
                   f" max constraint: {np.max([constraint(C, a) for a in A])}")
@@ -135,24 +134,26 @@ def solve_optimization(A):
     # plot the objective function and the objective function with barrier
 
     plt.plot(objective_score, label="objective")
-    plt.plot(objective_with_barrier_score, label="objective with barrier")
+    # plt.plot(objective_with_barrier_score, label="objective with barrier")
     plt.legend()
     plt.show()
 
     return inv(C)
 
 
-def main():
-    A = np.random.randint(low=-100, high=100, size=(M, n))
-    # Solve the optimization problem
-    X_optimal = solve_optimization(A)
-    print("Optimal X:")
-    print(X_optimal)
-    print("Objective value:")
-    print(objective(X_optimal))
-
-    # print(f"Benchmark : {Benchmark.optimize(A)}")
+# Example usage:
 
 
-if __name__ == '__main__':
-    main()
+# Generate random vectors a
+
+# for i in range(1000):
+#     A = np.random.rand(M, n)
+#     X = generate_initializer(A)
+#     assert check_constraint(X, A)
+#     assert is_pd(X)
+
+A = np.random.rand(M, n)
+# Solve the optimization problem
+X_optimal = solve_optimization(A)
+# print("Optimal X:")
+# print(X_optimal)
