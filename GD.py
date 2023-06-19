@@ -2,7 +2,7 @@ import numpy as np
 
 M = 10  # Number of vectors a
 n = 40  # Dimension of the vectors a
-step = 0.000001
+step = 0.00000001
 epsilon = 0.0001
 
 
@@ -15,6 +15,13 @@ def objective(X):
     # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(X))
 
+<<<<<<< HEAD
+=======
+def objective_var_change(C):
+# Objective function: negative logarithm of the determinant of X
+    return np.log(np.linalg.det(inv(C)))
+
+>>>>>>> e716829d7b267385e3041a0b49f41951bf39c0ab
 
 def is_pd(X):
     return np.all(np.linalg.eigvalsh(X) > 0)
@@ -26,8 +33,7 @@ def is_sym(X):
 
 def constraint(X, a):
     # Constraint function: a_i^T * X^(-1) * a_i <= 1
-    X_inv = np.linalg.inv(X)
-    return np.dot(a.T, np.dot(X_inv, a))
+    return np.dot(a.T, np.dot(X, a))
 
 
 def projected_grad(X):
@@ -91,33 +97,24 @@ def solve_optimization(A):
     max_iter = 1000  # Maximum number of iterations
 
     # Perform the optimization using gradient descent
-    X = X0.copy()
+    C = inv(X0.copy())
     for i in range(max_iter):
-        X_inv = inv(X)
-        # alpha = a.T @ X_inv @ a
-        # alpha_list = [a.T @ X_inv @ a for a in A]
-        # alpha_mat_list = [np.diag(a) @ X_inv @ np.diag(a) for a in A]
-        t = i + 1
-        grad = X_inv - 1 / t * np.sum(
-            [(np.diag(a) @ X_inv @ X_inv @ np.diag(a)) / (1 - a.T @ X_inv @ a - epsilon) for a in A], axis=0)
-        # grad = +X_inv @ np.sum([1 - 1/t*(alpha_mat_list[j]/(1-alpha_list[j])) for j in range(M)], axis=0)
 
-        X_new = X - step * grad
-        X = projected_grad(X_new)
+        C_inv = inv(C)
+        grad = -C_inv + 1/(i+1) * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
+        C_next = C - step * grad
+        C = projected_grad(C_next)
 
-        # assert check_constraint(X,A)
+
+        # assert check_constraint(C,A)
 
         if np.linalg.norm(grad) < epsilon:
             break
 
         if i % 50 == 0:
-            print(objective(X))
+            print(f"Iteration {i}: {objective_var_change(C)}")
 
-    print([constraint(X, a) for a in A])
-    # print(f"Check constraint: {check_constraint(X, A)}")
-    print(f"{objective(X)}")
-
-    return X
+    return inv(C)
 
 
 # Example usage:
