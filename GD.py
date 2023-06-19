@@ -1,7 +1,8 @@
 import numpy as np
-
-M = 10  # Number of vectors a
-n = 40  # Dimension of the vectors a
+import matplotlib.pyplot as plt
+np.random.seed(0)
+M = 30  # Number of vectors a
+n = 30  # Dimension of the vectors a
 step = 0.00000001
 epsilon = 0.0001
 
@@ -13,6 +14,10 @@ def inv(X):
 def objective(X):
     # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(X))
+
+def objective_with_barrier(X, A, alpha=1.0):
+    # Objective function: negative logarithm of the determinant of X
+    return np.log(np.linalg.det(X)) - np.sum([np.log(1 - a.T @ X @ a) for a in A]) * alpha
 
 def objective_var_change(C):
 # Objective function: negative logarithm of the determinant of X
@@ -69,7 +74,7 @@ def generate_initializer(A):
     i_max_norm = np.argmax([np.linalg.norm(a) for a in A])
     a_max_norm = a_vectors[i_max_norm]
     max_norm2 = np.linalg.norm(a_max_norm, ord=2)**2
-    D = np.diag(max_norm2*np.ones(n))
+    D = np.diag(max_norm2*np.ones(n)) * 2
     # U = generate_orthogonal_basis(a_max_norm)
 
     X0 = D
@@ -79,29 +84,42 @@ def generate_initializer(A):
 
 def solve_optimization(A):
     # Generate a random positive definite symmetric matrix as the initial guess
-    #X0 = generate_random_X()
     X0 = generate_initializer(A)
 
     # Define the optimization parameters
-    max_iter = 1000  # Maximum number of iterations
-
+    max_iter = 10000  # Maximum number of iterations
 
     # Perform the optimization using gradient descent
-    C = inv(X0.copy())
+    objective_score = []
+    objective_with_barrier_score = []
+    C = inv(X0)
     for i in range(max_iter):
         C_inv = inv(C)
-        grad = -C_inv + 1/(i+1) * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
+        t = i + 1
+        alpha = 1 / t
+        log_barrier = alpha * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
+        grad = -C_inv + log_barrier
         C_next = C - step * grad
         C = projected_grad(C_next)
 
 
-        # assert check_constraint(C,A)
+        assert check_constraint(C,A)
 
         if np.linalg.norm(grad) < epsilon:
             break
-
+        objective_score.append(objective_var_change(C))
+        objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
         if i % 50 == 0:
-            print(f"Iteration {i}: {objective_var_change(C)}")
+            print(f"Iteration {i}, objective:{objective_var_change(C)},"
+                  f" objective with barrier: {objective_with_barrier(C, A, alpha=alpha)},"
+                  f" max constraint: {np.max([constraint(C, a) for a in A])}")
+
+    # plot the objective function and the objective function with barrier
+
+    plt.plot(objective_score, label="objective")
+    plt.plot(objective_with_barrier_score, label="objective with barrier")
+    plt.legend()
+    plt.show()
 
     return inv(C)
 
