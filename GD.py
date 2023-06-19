@@ -1,4 +1,5 @@
 import numpy as np
+import Benchmark
 
 M = 10  # Number of vectors a
 n = 40  # Dimension of the vectors a
@@ -15,9 +16,11 @@ def objective(X):
     # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(X))
 
+
 def objective_var_change(C):
-# Objective function: negative logarithm of the determinant of X
+    # Objective function: negative logarithm of the determinant of X
     return np.log(np.linalg.det(inv(C)))
+
 
 def is_pd(X):
     return np.all(np.linalg.eigvalsh(X) > 0)
@@ -40,6 +43,10 @@ def projected_grad(X):
 
 def check_constraint(X, A):
     return all([constraint(X, a) <= 1.001 for a in A])
+
+
+def get_xT_C_x(X, A):
+    return [constraint(X, a) for a in A]
 
 
 def generate_random_X():
@@ -97,10 +104,9 @@ def solve_optimization(A):
     for i in range(max_iter):
 
         C_inv = inv(C)
-        grad = -C_inv + 1/(i+1) * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
+        grad = -C_inv + 1 / (i + 1) * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
         C_next = C - step * grad
         C = projected_grad(C_next)
-
 
         # assert check_constraint(C,A)
 
@@ -113,19 +119,17 @@ def solve_optimization(A):
     return inv(C)
 
 
-# Example usage:
+def main():
+    A = np.random.randint(low=-100, high=100, size=(M, n))
+    # Solve the optimization problem
+    X_optimal = solve_optimization(A)
+    print("Optimal X:")
+    print(X_optimal)
+    print("Objective value:")
+    print(objective(X_optimal))
+
+    # print(f"Benchmark : {Benchmark.optimize(A)}")
 
 
-# Generate random vectors a
-
-# for i in range(1000):
-#     A = np.random.rand(M, n)
-#     X = generate_initializer(A)
-#     assert check_constraint(X, A)
-#     assert is_pd(X)
-
-A = np.random.randint(low=-10, high=10, size=(M, n))
-# Solve the optimization problem
-X_optimal = solve_optimization(A)
-# print("Optimal X:")
-# print(X_optimal)
+if __name__ == '__main__':
+    main()
