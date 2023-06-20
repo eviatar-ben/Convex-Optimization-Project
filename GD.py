@@ -2,9 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(0)
-M = 30  # Number of vectors a
-n = 30  # Dimension of the vectors a
-step = 0.00000001
+M = 10  # Number of vectors a
+n = 10  # Dimension of the vectors a
+step = 0.000001
 epsilon = 0.0001
 
 
@@ -43,12 +43,12 @@ def constraint(X, a):
 
 def projected_grad(X):
     eigenvalues, eigenvectors = np.linalg.eigh(X)
-    eigenvalues[eigenvalues < 0] = 0
+    eigenvalues[eigenvalues <= 0] = epsilon
     return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T + epsilon * np.eye(n)
 
 
 def check_constraint(X, A):
-    return all([constraint(X, a) <= 1.001 for a in A])
+    return all([constraint(X, a) <= 1 + epsilon for a in A])
 
 
 def generate_random_X():
@@ -85,11 +85,11 @@ def generate_initializer(A):
     i_max_norm = np.argmax([np.linalg.norm(a) for a in A])
     a_max_norm = a_vectors[i_max_norm]
     max_norm2 = np.linalg.norm(a_max_norm, ord=2) ** 2
-    D = np.diag(max_norm2 * np.ones(n)) * 2
-    # U = generate_orthogonal_basis(a_max_norm)
+    D = np.diag(max_norm2 * np.ones(n))
+    U = generate_orthogonal_basis(a_max_norm)
 
-    X0 = D
-    # X0 = U @ D @ U.T
+    #X0 = D
+    X0 = U @ D @ U.T
     return X0
 
 
@@ -98,33 +98,35 @@ def solve_optimization(A):
     X0 = generate_initializer(A)
 
     # Define the optimization parameters
-    max_iter = 10000  # Maximum number of iterations
+    max_iter = 100000  # Maximum number of iterations
 
     # Perform the optimization using gradient descent
     objective_score = []
     objective_with_barrier_score = []
+    alphas = []
     C = inv(X0)
     for i in range(max_iter):
         C_inv = inv(C)
         t = i + 1
         alpha = 1 / t
-        # alpha = t
         if np.max([constraint(C, a) for a in A]) > 0.99:
-            pass
-        if np.max([constraint(C, a) for a in A]) > 0.83:
-            alpha =  t
-        multiplier = [a.T @ C @ a - 1 for a in A]  # todo: maybe C_inv
-
+            alpha = t
+        equality_constraint = np.outer(A[-1], A[-1]) / (1.25 - A[-1].T @ C @ A[-1]) + np.outer(A[-1], A[-1]) / (0.75 + A[-1].T @ C @ A[-1])
         log_barrier = alpha * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
-        grad = -C_inv + log_barrier
+        grad = -C_inv + log_barrier #+ equality_constraint
         C_next = C - step * grad
+        if not check_constraint(C_next,A):
+            print("constraint violated")
         C = projected_grad(C_next)
 
-        # assert check_constraint(C,A)
+        assert is_pd(C)
+        assert check_constraint(C, A)
 
         if np.linalg.norm(grad) < epsilon:
             break
         if i % 50 == 0:
+            alphas.append(alpha)
+
             objective_score.append(objective_var_change(C))
             objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
             print(f"Iteration {i}, objective:{objective_var_change(C)},"
@@ -153,7 +155,8 @@ def solve_optimization(A):
 #     assert is_pd(X)
 
 A = np.random.rand(M, n)
-# Solve the optimization problem
+# sort the vectors in A by their norm
+A = A[np.argsort([np.linalg.norm(a) for a in A])]
 X_optimal = solve_optimization(A)
-# print("Optimal X:")
-# print(X_optimal)
+#print("Optimal X:")
+#print(X_optimal)
