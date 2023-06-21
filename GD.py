@@ -103,6 +103,8 @@ def solve_optimization(A):
     # Perform the optimization using gradient descent
     objective_score = []
     objective_with_barrier_score = []
+    alphas = []
+    constraints_violation = []
     C = inv(X0)
     for i in range(max_iter):
         C_inv = inv(C)
@@ -120,11 +122,15 @@ def solve_optimization(A):
         C_next = C - step * grad
         C = projected_grad(C_next)
 
-        # assert check_constraint(C,A)
+        assert check_constraint(C,A)
+        # assert is_pd(inv(C))
+        # assert is_pd(C)
 
         if np.linalg.norm(grad) < epsilon:
             break
         if i % 50 == 0:
+            constraints_violation.append(np.max([constraint(C, a) for a in A]))
+            alphas.append(alpha)
             objective_score.append(objective_var_change(C))
             objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
             print(f"Iteration {i}, objective:{objective_var_change(C)},"
@@ -133,7 +139,9 @@ def solve_optimization(A):
 
     # plot the objective function and the objective function with barrier
 
-    plt.plot(objective_score, label="objective")
+    # plt.plot(objective_score, label="objective")
+    # plt.plot(alphas, label="alphas")
+    plt.plot(constraints_violation, label="constraints margin")
     # plt.plot(objective_with_barrier_score, label="objective with barrier")
     plt.legend()
     plt.show()
