@@ -1,11 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from glob import glob
+import os
 
 np.random.seed(0)
-M = 10  # Number of vectors a
-n = 10  # Dimension of the vectors a
+
 step = 0.000001
 epsilon = 0.0001
+
 
 
 def inv(X):
@@ -44,26 +46,11 @@ def constraint(X, a):
 def projected_grad(X):
     eigenvalues, eigenvectors = np.linalg.eigh(X)
     eigenvalues[eigenvalues <= 0] = epsilon
-    return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T + epsilon * np.eye(n)
+    return eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T #+ epsilon * np.eye(n)
 
 
 def check_constraint(X, A):
     return all([constraint(X, a) <= 1 + epsilon for a in A])
-
-
-def generate_random_X():
-    # Generate a random lower triangular matrix
-    # lower_triangular = np.random.uniform(0, 1, size=(n, n))
-    # lower_triangular[np.triu_indices(n, 1)] = 0
-    #
-    # # Construct a symmetric matrix
-    # symmetric_matrix = lower_triangular @ lower_triangular.T
-    root_matrix = np.random.rand(n, n)
-    psd = root_matrix @ root_matrix.T
-    # Add a small positive constant to ensure positive definiteness
-    positive_definite_matrix = psd + np.eye(n) * epsilon
-    return positive_definite_matrix
-
 
 def generate_orthogonal_basis(vector):
     n = len(vector)
@@ -77,6 +64,12 @@ def generate_orthogonal_basis(vector):
         orthogonal_vector /= np.linalg.norm(orthogonal_vector)  # Normalize the orthogonal vector
         basis.append(orthogonal_vector)
 
+    for b1 in basis:
+        for b2 in basis:
+            if b1 is not b2:
+                assert np.abs(np.dot(b1, b2)) < epsilon
+            else:
+                assert np.abs(np.dot(b1, b2) - 1) < epsilon
     return np.array(basis).T
 
 
@@ -85,38 +78,43 @@ def generate_initializer(A):
     i_max_norm = np.argmax([np.linalg.norm(a) for a in A])
     a_max_norm = a_vectors[i_max_norm]
     max_norm2 = np.linalg.norm(a_max_norm, ord=2) ** 2
-    D = np.diag(max_norm2 * np.ones(n))
+    D = np.diag((max_norm2) * np.ones(len(a_max_norm)))
     U = generate_orthogonal_basis(a_max_norm)
-
-    #X0 = D
     X0 = U @ D @ U.T
     return X0
 
 
-def solve_optimization(A):
+def solve_optimization(A, name):
     # Generate a random positive definite symmetric matrix as the initial guess
     X0 = generate_initializer(A)
 
     # Define the optimization parameters
-    max_iter = 100000  # Maximum number of iterations
+    max_iter = 1000  # Maximum number of iterations
 
     # Perform the optimization using gradient descent
     objective_score = []
     objective_with_barrier_score = []
     alphas = []
     C = inv(X0)
+    constraints_list = {i:[] for i in range(len(A))}
+    constraints_flag = True
     for i in range(max_iter):
+        for j in range(len(A)):
+            constraints_list[j].append(constraint(C, A[j]))
         C_inv = inv(C)
         t = i + 1
         alpha = 1 / t
-        if np.max([constraint(C, a) for a in A]) > 0.99:
-            alpha = t
-        equality_constraint = np.outer(A[-1], A[-1]) / (1.25 - A[-1].T @ C @ A[-1]) + np.outer(A[-1], A[-1]) / (0.75 + A[-1].T @ C @ A[-1])
-        log_barrier = alpha * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A], axis=0)
-        grad = -C_inv + log_barrier #+ equality_constraint
+        # if np.max([constraint(C, a) for a in A]) > 0.99:
+        #     alpha = t
+        equality_constraint = (1/t) * np.outer(A[-1], A[-1]) / (1 - A[-1].T @ C @ A[-1] + epsilon) - np.outer(A[-1], A[-1]) / (A[-1].T @ C @ A[-1])
+        log_barrier = alpha * np.sum([np.outer(a, a) / (1 - a.T @ C @ a) for a in A[:-1]], axis=0)
+        grad = -C_inv + log_barrier + equality_constraint
+        # calculate the hessian
         C_next = C - step * grad
         if not check_constraint(C_next,A):
             print("constraint violated")
+            constraints_flag = False
+            break
         C = projected_grad(C_next)
 
         assert is_pd(C)
@@ -128,35 +126,29 @@ def solve_optimization(A):
             alphas.append(alpha)
 
             objective_score.append(objective_var_change(C))
-            objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
+            # objective_with_barrier_score.append(objective_with_barrier(C, A, alpha=alpha))
             print(f"Iteration {i}, objective:{objective_var_change(C)},"
                   f" objective with barrier: {objective_with_barrier(C, A, alpha=alpha)},"
                   f" max constraint: {np.max([constraint(C, a) for a in A])}")
 
-    # plot the objective function and the objective function with barrier
-
+    # plot the objective function
     plt.plot(objective_score, label="objective")
-    # plt.plot(objective_with_barrier_score, label="objective with barrier")
     plt.legend()
-    plt.show()
-
+    plt.savefig(f"figures/{name}_objective.png")
+    # plot the constraints
+    for i in range(len(A)):
+        plt.plot(constraints_list[i], label=f"constraint {i}")
+    plt.legend()
+    plt.savefig(f"figures/{name}_constraints_({constraints_flag}).png")
     return inv(C)
 
-
-# Example usage:
-
-
-# Generate random vectors a
-
-# for i in range(1000):
-#     A = np.random.rand(M, n)
-#     X = generate_initializer(A)
-#     assert check_constraint(X, A)
-#     assert is_pd(X)
-
-A = np.random.rand(M, n)
-# sort the vectors in A by their norm
-A = A[np.argsort([np.linalg.norm(a) for a in A])]
-X_optimal = solve_optimization(A)
-#print("Optimal X:")
-#print(X_optimal)
+if __name__ == "__main__":
+    # A = np.random.rand(M, n)
+    for path in glob(".\examples\*"):
+        # load npy file:
+        name = os.path.basename(path).split(".npy")[0]
+        print(f"processing {name}")
+        A = np.load(path)
+        A = A[np.argsort([np.linalg.norm(a) for a in A])]
+        X_optimal = solve_optimization(A, name)
+        break
