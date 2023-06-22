@@ -78,7 +78,7 @@ def generate_initializer(A):
     i_max_norm = np.argmax([np.linalg.norm(a) for a in A])
     a_max_norm = a_vectors[i_max_norm]
     max_norm2 = np.linalg.norm(a_max_norm, ord=2) ** 2
-    D = np.diag((max_norm2+0.01) * np.ones(len(a_max_norm)))
+    D = np.diag((max_norm2 + 0.01) * np.ones(len(a_max_norm)))
     U = generate_orthogonal_basis(a_max_norm)
     X0 = U @ D @ U.T
     return X0
@@ -92,8 +92,8 @@ def generate_initializer2(A):
         xi_index = np.argmax([constraint(X, a) for a in A])
         xi = A[xi_index]
         xi /= 2
-        X[xi_index] =xi
-    X =projected_grad(X)
+        X[xi_index] = xi
+    X = projected_grad(X)
 
     return X
 
@@ -102,7 +102,7 @@ def solve_optimization(A, name):
     # Generate a random positive definite symmetric matrix as the initial guess
     X0 = generate_initializer(A)
     assert is_pd(X0)
-    assert check_constraint(X0, A)
+    assert check_constraint(inv(X0), A)
 
     # Define the optimization parameters
     max_iter = 1000  # Maximum number of iterations

@@ -1,12 +1,18 @@
 import cvxpy as cp
 import numpy as np
 
+import numpy as np
+
 
 def score(X, A):
-    scores = np.einsum('...i,ij,...j->...', A, X, A)
-    return np.log(np.linalg.det(X)), np.mean(scores <= 1. + 1e-8)  # industrial solvers always miss
+    scores = np.einsum('...i,ij,...j->...', A, np.linalg.inv(X), A)
+    _, logdet = np.linalg.slogdet(X)
+    return logdet, np.all(scores <= 1.)
 
 
+n, d = 100, 3
+np.random.seed(0)
+A = np.random.randn(n, d) * (np.arange(d) + 1.)
 
 
 
@@ -28,9 +34,11 @@ def solve_cvx(A):
 
     # fixing the result and projection
     X = R.value.T @ R.value
-    X /= np.max(np.einsum('...i,ij,...j->...', A, X, A))
+    return np.linalg.inv(X) * np.max(np.einsum('...i,ij,...j->...', A, X, A))
 
-    return X
+
+X_cvx = solve_cvx(A)
+score(X_cvx, A)
 
 
 def optimize(A):
@@ -46,5 +54,5 @@ if __name__ == '__main__':
     A = np.random.rand(M, n)
     # sort the vectors in A by their norm
     A = A[np.argsort([np.linalg.norm(a) for a in A])]
-    #A = np.random.randn(n, d) * (np.arange(d) + 1.)
+    # A = np.random.randn(n, d) * (np.arange(d) + 1.)
     print(optimize(A))
